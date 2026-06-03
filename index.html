@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Item Sorter</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div>
+          <h1>Item Sorter</h1>
+          <p class="subtitle">Weighted random printer assignment with local save, text export, and text import.</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="addPrinterBtn" class="primary">Add Printer</button>
+          <button id="addRequestBtn" class="primary">Add Request</button>
+          <button id="exportBtn">Export Text</button>
+          <button id="importBtn">Import Text</button>
+        </div>
+      </header>
+
+      <div id="statusBanner" class="status-banner" aria-live="polite"></div>
+
+      <main class="content">
+        <section class="section-block">
+          <div class="section-head">
+            <h2>Printers</h2>
+            <span id="printerCount" class="muted"></span>
+          </div>
+          <div id="printersContainer" class="printers-grid"></div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-head">
+            <h2>Unassigned</h2>
+            <span id="unassignedCount" class="muted"></span>
+          </div>
+          <div id="unassignedContainer" class="queue-list"></div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-head">
+            <h2>Printed Queue</h2>
+            <span id="printedCount" class="muted"></span>
+          </div>
+          <div id="printedContainer" class="queue-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="modalOverlay" class="modal-overlay hidden" role="presentation" aria-hidden="true">
+      <div id="modalPanel" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-head">
+          <h3 id="modalTitle"></h3>
+          <button id="modalCloseBtn" class="icon-btn" aria-label="Close dialog">×</button>
+        </div>
+        <div id="modalBody" class="modal-body"></div>
+        <div id="modalFooter" class="modal-footer"></div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
