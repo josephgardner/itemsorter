@@ -353,6 +353,15 @@ function printerByName(name) {
   return state.printers.find((printer) => printer.name.toLowerCase() === target) || null;
 }
 
+function requestById(id) {
+  return (
+    state.active.find((request) => request.id === id) ||
+    state.unassigned.find((request) => request.id === id) ||
+    state.printed.find((request) => request.id === id) ||
+    null
+  );
+}
+
 function activeRequestsForPrinter(printerId) {
   return state.active.filter((request) => request.printerId === printerId);
 }
@@ -484,6 +493,23 @@ async function renamePrinter(printerId) {
 
   printer.name = nextName;
   showBanner(`Renamed printer to ${nextName}.`);
+  saveState();
+  render();
+}
+
+async function renameRequest(requestId) {
+  const request = requestById(requestId);
+  if (!request) {
+    return;
+  }
+
+  const nextTitle = await promptDialog("Rename Request", "New request title", request.title);
+  if (nextTitle === null || !nextTitle) {
+    return;
+  }
+
+  request.title = nextTitle;
+  showBanner(`Renamed request to ${nextTitle}.`);
   saveState();
   render();
 }
@@ -737,12 +763,13 @@ function renderPrinterCard(printer, chanceById) {
     ? activeRequests
         .map(
           (request) => `
-            <div class="queue-card">
+            <div class="queue-card" data-request-id="${request.id}">
               <div class="queue-main">
                 <div class="queue-title">${escapeHtml(request.title)}</div>
                 <div class="queue-subtitle">Assigned to ${escapeHtml(printer.name)}</div>
               </div>
               <div class="queue-actions">
+                <button data-action="rename-request" data-id="${request.id}">Rename</button>
                 <button data-action="printed" data-id="${request.id}">Printed</button>
                 <button data-action="reassign" data-id="${request.id}">Reassign</button>
               </div>
@@ -762,7 +789,10 @@ function renderPrinterCard(printer, chanceById) {
             <span class="badge chance">${chance.toFixed(0)}% chance</span>
           </div>
         </div>
-        <button class="icon-btn" data-action="delete-printer" data-id="${printer.id}" aria-label="Delete printer">×</button>
+        <div class="printer-head-actions">
+          <button class="icon-btn" data-action="rename-printer" data-id="${printer.id}" aria-label="Rename printer">✎</button>
+          <button class="icon-btn" data-action="delete-printer" data-id="${printer.id}" aria-label="Delete printer">×</button>
+        </div>
       </div>
 
       <div class="meta-row">
@@ -773,7 +803,6 @@ function renderPrinterCard(printer, chanceById) {
           </select>
         </label>
       </div>
-
       <div class="printer-actions">
         <button data-action="reassign-all" data-id="${printer.id}">Reassign work</button>
       </div>
@@ -800,14 +829,17 @@ function renderQueueCard(request, kind) {
   const buttons =
     kind === "printed"
       ? `
+        <button data-action="rename-request" data-id="${request.id}">Rename</button>
         <button data-action="restore" data-id="${request.id}">Restore</button>
       `
       : kind === "active"
         ? `
+          <button data-action="rename-request" data-id="${request.id}">Rename</button>
           <button data-action="printed" data-id="${request.id}">Printed</button>
           <button data-action="reassign" data-id="${request.id}">Move</button>
         `
         : `
+          <button data-action="rename-request" data-id="${request.id}">Rename</button>
           <button data-action="reassign" data-id="${request.id}">Assign</button>
         `;
 
@@ -1094,6 +1126,10 @@ function wireEvents() {
   });
 
   document.addEventListener("click", async (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
     const button = event.target.closest("[data-action]");
     if (!button) {
       return;
@@ -1107,11 +1143,13 @@ function wireEvents() {
       return;
     }
 
+    if (action === "rename-request") {
+      await renameRequest(id);
+      return;
+    }
+
     if (action === "reassign") {
-      const currentRequest =
-        state.active.find((entry) => entry.id === id) ||
-        state.unassigned.find((entry) => entry.id === id) ||
-        state.printed.find((entry) => entry.id === id);
+      const currentRequest = requestById(id);
       await reassignRequest(id, currentRequest?.printerId || null);
       return;
     }
@@ -1121,13 +1159,18 @@ function wireEvents() {
       return;
     }
 
+    if (action === "rename-printer") {
+      await renamePrinter(id);
+      return;
+    }
+
     if (action === "delete-printer") {
       removePrinter(id);
       return;
     }
 
     if (action === "restore") {
-      const currentRequest = state.printed.find((entry) => entry.id === id);
+      const currentRequest = requestById(id);
       await assignExistingRequest(id, currentRequest?.printerId || null);
     }
   });
@@ -1153,6 +1196,13 @@ function wireEvents() {
 
     const card = event.target.closest(".printer-card[data-printer-id]");
     if (!card || event.target.closest("button, select, input, textarea, label")) {
+      const requestCard = event.target.closest(".queue-card[data-request-id]");
+      if (!requestCard || event.target.closest("button, select, input, textarea, label")) {
+        return;
+      }
+
+      event.preventDefault();
+      await renameRequest(requestCard.dataset.requestId);
       return;
     }
 

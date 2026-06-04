@@ -332,6 +332,12 @@ button.primary:hover {
   gap: 12px;
 }
 
+.printer-head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
 .printer-title {
   margin: 0;
   font-size: 1.14rem;
@@ -431,6 +437,19 @@ button.primary:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.queue-card[data-request-id] {
+  cursor: pointer;
+}
+
+.queue-card[data-request-id]:hover {
+  border-color: rgba(111, 130, 255, 0.42);
+  transform: translateY(-1px);
 }
 
 .queue-main {
@@ -746,21 +765,143 @@ button.primary:hover {
 }
 
 @media (max-width: 760px) {
+  .page-shell {
+    width: min(100vw, calc(100vw - 12px));
+    padding: 10px 0 18px;
+  }
+
   .topbar {
     flex-direction: column;
+    gap: 14px;
+    padding: 18px 16px 14px;
+    border-radius: 22px;
   }
 
   .topbar-actions {
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100%;
   }
 
+  .topbar-actions button {
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: 1rem;
+  }
+
+  .topbar-actions .action-share {
+    grid-column: span 2;
+  }
+
+  .status-banner {
+    margin: 10px 2px 0;
+    line-height: 1.35;
+  }
+
+  .content {
+    gap: 14px;
+    margin-top: 12px;
+  }
+
+  .section-block {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .section-head {
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .section-head h2 {
+    font-size: 1.08rem;
+  }
+
+  .muted {
+    font-size: 0.86rem;
+  }
+
+  .printers-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .printer-card,
   .queue-card {
-    align-items: flex-start;
-    flex-direction: column;
+    padding: 14px;
+    border-radius: 20px;
   }
 
   .printer-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .printer-head-actions {
+    margin-left: auto;
+  }
+
+  .icon-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.7rem;
+    font-size: 1rem;
+  }
+
+  .printer-meta {
+    gap: 10px;
+  }
+
+  .meta-row {
+    gap: 6px;
+  }
+
+  .status-select {
+    width: 100%;
+    min-width: 0;
+    min-height: 3rem;
+    padding: 0.7rem 0.75rem;
+    border-radius: 0.95rem;
+  }
+
+  .printer-actions,
+  .queue-actions {
+    gap: 10px;
+  }
+
+  .queue-card {
+    align-items: stretch;
     flex-direction: column;
+  }
+
+  .printer-actions button,
+  .queue-actions button {
+    min-height: 2.9rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.95rem;
+  }
+
+  .queue-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .queue-main {
+    gap: 5px;
+  }
+
+  .queue-actions button:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
+  .queue-title {
+    font-size: 1rem;
+  }
+
+  .queue-subtitle {
+    line-height: 1.35;
   }
 
   .backup-card__hero,
