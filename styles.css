@@ -170,6 +170,15 @@ button.primary:hover {
   background: linear-gradient(180deg, #29424c 0%, #183038 100%);
 }
 
+.action-share {
+  border-color: rgba(157, 173, 212, 0.4);
+  background: linear-gradient(180deg, #26304b 0%, #182033 100%);
+}
+
+.action-share:hover {
+  background: linear-gradient(180deg, #303c5c 0%, #1d2740 100%);
+}
+
 .page-shell {
   width: min(1180px, calc(100vw - 24px));
   margin: 0 auto;
@@ -296,6 +305,7 @@ button.primary:hover {
   gap: 12px;
   position: relative;
   overflow: hidden;
+  touch-action: manipulation;
 }
 
 .printer-card::after {
@@ -469,6 +479,9 @@ button.primary:hover {
   padding: 16px;
   z-index: 50;
   backdrop-filter: blur(8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hidden {
@@ -482,6 +495,10 @@ button.primary:hover {
   border-radius: 22px;
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
   padding: 14px;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal[data-kind="backup"] {
@@ -530,6 +547,7 @@ button.primary:hover {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+  flex: 0 0 auto;
 }
 
 .modal-head h3 {
@@ -540,6 +558,12 @@ button.primary:hover {
 .modal-body {
   display: grid;
   gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
 }
 
 .modal[data-kind="backup"] .modal-body {
@@ -577,6 +601,16 @@ button.primary:hover {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 14px;
+  flex: 0 0 auto;
+}
+
+.modal-footer button.danger {
+  border-color: rgba(255, 109, 122, 0.65);
+  background: linear-gradient(180deg, #4a1f28 0%, #33141b 100%);
+}
+
+.modal-footer button.danger:hover {
+  background: linear-gradient(180deg, #5b2630 0%, #401820 100%);
 }
 
 .help-text {
@@ -736,5 +770,20 @@ button.primary:hover {
 
   .backup-card__version {
     justify-self: start;
+  }
+
+  .modal-overlay {
+    align-items: flex-start;
+    padding: 10px;
+  }
+
+  .modal {
+    width: min(680px, 100%);
+    max-height: calc(100dvh - 20px);
+    padding: 12px;
+  }
+
+  .modal-body textarea {
+    min-height: 220px;
   }
 }

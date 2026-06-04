@@ -1,0 +1,7 @@
+{
+  "name": "itemsorter",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/core.test.mjs"
+  }
+}

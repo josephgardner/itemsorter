@@ -1,5 +1,6 @@
 const STORAGE_KEY = "itemsorter.raw.v1";
 const EXPORT_VERSION = "ITEMSORTER v1";
+const SHARE_HASH_KEY = "state";
 const RECENT_WINDOW = 5;
 const STATUSES = ["ready to use", "good", "unused", "clogged", "down"];
 const ELIGIBLE_STATUSES = new Set(["ready to use", "good", "unused"]);
@@ -15,6 +16,7 @@ const state = {
 const dom = {
   addPrinterBtn: document.getElementById("addPrinterBtn"),
   addRequestBtn: document.getElementById("addRequestBtn"),
+  shareBtn: document.getElementById("shareBtn"),
   exportBtn: document.getElementById("exportBtn"),
   importBtn: document.getElementById("importBtn"),
   printersContainer: document.getElementById("printersContainer"),
@@ -60,6 +62,61 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+const ItemSorterCore = globalThis.ItemSorterCore;
+
+if (!ItemSorterCore) {
+  throw new Error("ItemSorterCore must be loaded before app.js");
+}
+
+async function compressText(text) {
+  return ItemSorterCore.compressText(text);
+}
+
+async function decompressText(value) {
+  return ItemSorterCore.decompressText(value);
+}
+
+function buildShareState() {
+  return ItemSorterCore.buildShareState(state, printerById, internalId);
+}
+
+function parseShareState(data) {
+  return ItemSorterCore.parseShareState(data, {
+    statuses: STATUSES,
+    defaultStatus: DEFAULT_STATUS,
+  });
+}
+
+async function loadSharedStateFromUrl() {
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const encoded = params.get(SHARE_HASH_KEY);
+  if (!encoded) {
+    return null;
+  }
+
+  try {
+    const text = await decompressText(encoded);
+    return parseShareState(JSON.parse(text));
+  } catch (error) {
+    return null;
+  }
+}
+
+async function buildShareUrl() {
+  const url = new URL(window.location.href);
+  const payload = await compressText(JSON.stringify(buildShareState()));
+  url.hash = `${SHARE_HASH_KEY}=${payload}`;
+  return url.toString();
+}
+
+function applyParsedState(parsed) {
+  state.printers = parsed.printers;
+  state.active = parsed.active;
+  state.unassigned = parsed.unassigned;
+  state.printed = parsed.printed;
+  internalId = parsed.internalId;
+}
+
 function openModal({ title, body, footerButtons = [], onClose = null, kind = "default" }) {
   activeModal = { onClose };
   dom.modalTitle.textContent = title;
@@ -72,6 +129,9 @@ function openModal({ title, body, footerButtons = [], onClose = null, kind = "de
     el.textContent = button.label;
     if (button.primary) {
       el.classList.add("primary");
+    }
+    if (button.danger) {
+      el.classList.add("danger");
     }
     el.addEventListener("click", button.onClick);
     dom.modalFooter.appendChild(el);
@@ -115,6 +175,33 @@ function confirmDialog(title, message, confirmLabel = "OK") {
             resolve(true);
           },
         },
+      ],
+    });
+  });
+}
+
+function actionDialog(title, message, actions) {
+  return new Promise((resolve) => {
+    openModal({
+      title,
+      body: `<p class="help-text">${escapeHtml(message)}</p>`,
+      footerButtons: [
+        {
+          label: "Cancel",
+          onClick: () => {
+            closeModal();
+            resolve(null);
+          },
+        },
+        ...actions.map((action) => ({
+          label: action.label,
+          primary: Boolean(action.primary),
+          danger: Boolean(action.danger),
+          onClick: () => {
+            closeModal();
+            resolve(action.value);
+          },
+        })),
       ],
     });
   });
@@ -335,141 +422,19 @@ function loadState() {
   }
 
   const parsed = parseState(saved);
-  state.printers = parsed.printers;
-  state.active = parsed.active;
-  state.unassigned = parsed.unassigned;
-  state.printed = parsed.printed;
-  internalId = parsed.internalId;
+  applyParsedState(parsed);
 }
 
 function serializeState() {
-  const lines = [EXPORT_VERSION, ""];
-
-  lines.push("PRINTERS");
-  for (const printer of state.printers) {
-    lines.push(`${printer.name} | ${printer.status}`);
-  }
-
-  lines.push("");
-  lines.push("ACTIVE");
-  for (const request of state.active) {
-    const printer = printerById(request.printerId);
-    lines.push(printer ? `${request.title} | ${printer.name}` : request.title);
-  }
-
-  lines.push("");
-  lines.push("UNASSIGNED");
-  for (const request of state.unassigned) {
-    lines.push(request.title);
-  }
-
-  lines.push("");
-  lines.push("PRINTED");
-  for (const request of state.printed) {
-    const printer = printerById(request.printerId);
-    lines.push(printer ? `${request.title} | ${printer.name}` : request.title);
-  }
-
-  return lines.join("\n").trimEnd() + "\n";
+  return ItemSorterCore.serializeTextState(state, printerById, EXPORT_VERSION);
 }
 
 function parseState(text) {
-  const parsed = {
-    printers: [],
-    active: [],
-    unassigned: [],
-    printed: [],
-    internalId: 1,
-  };
-
-  let section = "";
-  const printerByName = new Map();
-  let nextId = 1;
-
-  const genId = (prefix) => `${prefix}_${nextId++}`;
-
-  const lines = String(text)
-    .replaceAll("\r\n", "\n")
-    .split("\n");
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-
-    const normalized = line.toUpperCase();
-    if (normalized === EXPORT_VERSION) {
-      continue;
-    }
-
-    if (normalized === "PRINTERS" || normalized === "ACTIVE" || normalized === "UNASSIGNED" || normalized === "PRINTED") {
-      section = normalized;
-      continue;
-    }
-
-    const cleaned = line.startsWith("-") ? line.slice(1).trim() : line;
-    const parts = cleaned
-      .split("|")
-      .map((part) => part.trim())
-      .filter(Boolean);
-
-    if (section === "PRINTERS") {
-      const name = cleanText(parts[0] || cleaned);
-      const status = STATUSES.includes((parts[1] || DEFAULT_STATUS).toLowerCase()) ? (parts[1] || DEFAULT_STATUS).toLowerCase() : DEFAULT_STATUS;
-      if (!name) {
-        continue;
-      }
-      const printer = {
-        id: genId("printer"),
-        name,
-        status,
-      };
-      parsed.printers.push(printer);
-      printerByName.set(name.toLowerCase(), printer);
-      continue;
-    }
-
-    if (section === "ACTIVE" || section === "PRINTED") {
-      const title = cleanText(parts[0] || cleaned);
-      const printerName = cleanText(parts[1] || "");
-      if (!title) {
-        continue;
-      }
-      const printer = printerName ? printerByName.get(printerName.toLowerCase()) || null : null;
-      const request = {
-        id: genId("request"),
-        title,
-        printerId: printer ? printer.id : null,
-        createdAt: Date.now(),
-      };
-      if (section === "ACTIVE") {
-        parsed.active.push(request);
-      } else {
-        parsed.printed.push({
-          ...request,
-          printedAt: Date.now(),
-        });
-      }
-      continue;
-    }
-
-    if (section === "UNASSIGNED") {
-      const title = cleanText(parts[0] || cleaned);
-      if (!title) {
-        continue;
-      }
-      parsed.unassigned.push({
-        id: genId("request"),
-        title,
-        printerId: null,
-        createdAt: Date.now(),
-      });
-    }
-  }
-
-  parsed.internalId = nextId;
-  return parsed;
+  return ItemSorterCore.parseTextState(text, {
+    exportVersion: EXPORT_VERSION,
+    statuses: STATUSES,
+    defaultStatus: DEFAULT_STATUS,
+  });
 }
 
 function ensureRequestInState(request) {
@@ -498,6 +463,29 @@ function addPrinter(name) {
   saveState();
   render();
   return true;
+}
+
+async function renamePrinter(printerId) {
+  const printer = printerById(printerId);
+  if (!printer) {
+    return;
+  }
+
+  const nextName = await promptDialog("Rename Printer", "New printer name", printer.name);
+  if (nextName === null || !nextName) {
+    return;
+  }
+
+  const duplicate = state.printers.find((entry) => entry.id !== printerId && entry.name.toLowerCase() === nextName.toLowerCase());
+  if (duplicate) {
+    showBanner("That printer already exists.", "error");
+    return;
+  }
+
+  printer.name = nextName;
+  showBanner(`Renamed printer to ${nextName}.`);
+  saveState();
+  render();
 }
 
 function autoAssignRequest(title) {
@@ -691,6 +679,31 @@ function removePrinter(printerId) {
     saveState();
     render();
   });
+}
+
+async function showPrinterActions(printerId) {
+  const printer = printerById(printerId);
+  if (!printer) {
+    return;
+  }
+
+  const action = await actionDialog(
+    "Printer Actions",
+    `What do you want to do with ${printer.name}?`,
+    [
+      { label: "Rename", value: "rename" },
+      { label: "Delete", value: "delete", danger: true },
+    ]
+  );
+
+  if (action === "rename") {
+    await renamePrinter(printerId);
+    return;
+  }
+
+  if (action === "delete") {
+    removePrinter(printerId);
+  }
 }
 
 async function setPrinterStatus(printerId, nextStatus) {
@@ -931,6 +944,60 @@ async function handleExport() {
   });
 }
 
+async function handleShare() {
+  const shareUrl = await buildShareUrl();
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Item Sorter",
+        url: shareUrl,
+      });
+      showBanner("Share link ready.");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        showBanner("Share canceled.");
+        return;
+      }
+    }
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+      showBanner("Share link copied to clipboard.");
+      return;
+    }
+  } catch (error) {
+    // Fall through to the modal below.
+  }
+
+  openModal({
+    title: "Share Link",
+    body: `
+      <label>
+        <span>Copy this link and send it to someone</span>
+        <textarea id="shareLinkArea" readonly rows="4">${escapeHtml(shareUrl)}</textarea>
+      </label>
+    `,
+    footerButtons: [
+      {
+        label: "Close",
+        onClick: closeModal,
+      },
+    ],
+  });
+
+  queueMicrotask(() => {
+    const area = document.getElementById("shareLinkArea");
+    if (area instanceof HTMLTextAreaElement) {
+      area.focus();
+      area.select();
+    }
+  });
+}
+
 async function saveBackupText(text) {
   const fileName = "itemsorter-backup.txt";
 
@@ -1016,6 +1083,7 @@ async function handleImport() {
 function wireEvents() {
   dom.addPrinterBtn.addEventListener("click", handleAddPrinter);
   dom.addRequestBtn.addEventListener("click", handleAddRequest);
+  dom.shareBtn.addEventListener("click", handleShare);
   dom.exportBtn.addEventListener("click", handleExport);
   dom.importBtn.addEventListener("click", handleImport);
   dom.modalCloseBtn.addEventListener("click", closeModal);
@@ -1064,6 +1132,34 @@ function wireEvents() {
     }
   });
 
+  document.addEventListener("contextmenu", async (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const card = event.target.closest(".printer-card[data-printer-id]");
+    if (!card || event.target.closest("button, select, input, textarea, label")) {
+      return;
+    }
+
+    event.preventDefault();
+    await showPrinterActions(card.dataset.printerId);
+  });
+
+  document.addEventListener("dblclick", async (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const card = event.target.closest(".printer-card[data-printer-id]");
+    if (!card || event.target.closest("button, select, input, textarea, label")) {
+      return;
+    }
+
+    event.preventDefault();
+    await showPrinterActions(card.dataset.printerId);
+  });
+
   document.addEventListener("change", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLSelectElement)) {
@@ -1090,14 +1186,23 @@ function wireEvents() {
   });
 }
 
-function bootstrap() {
-  loadState();
+async function bootstrap() {
+  const sharedState = await loadSharedStateFromUrl();
+  if (sharedState) {
+    applyParsedState(sharedState);
+    saveState();
+    showBanner("Loaded shared link.");
+  } else {
+    loadState();
+  }
   if (!state.printers.length && !state.active.length && !state.unassigned.length && !state.printed.length) {
     saveState();
   }
   wireEvents();
   render();
-  showBanner("Saved in this browser. Use Export Text for backups.");
+  if (!sharedState) {
+    showBanner("Saved in this browser. Use Export Text for backups.");
+  }
 }
 
 bootstrap();
