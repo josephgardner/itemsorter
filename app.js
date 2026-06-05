@@ -856,7 +856,7 @@ async function showRequestActions(requestId) {
 
 async function setPrinterStatus(printerId, nextStatus) {
   const printer = printerById(printerId);
-  if (!printer) {
+  if (!printer || !STATUSES.includes(nextStatus)) {
     return;
   }
 
@@ -878,7 +878,6 @@ async function setPrinterStatus(printerId, nextStatus) {
 function renderPrinterCard(printer, chanceById) {
   const activeRequests = activeRequestsForPrinter(printer.id);
   const chance = chanceById.get(printer.id) || 0;
-  const badgeClass = printer.status.replaceAll(" ", "-");
   const badgeVariantByStatus = {
     "ready to use": "success",
     good: "primary",
@@ -911,29 +910,43 @@ function renderPrinterCard(printer, chanceById) {
       <div class="printer-head">
         <div class="printer-meta">
           <h3 class="printer-title">${escapeHtml(printer.name)}</h3>
-          <div class="meta-row">
-            <sl-badge class="status-badge status-badge--${badgeClass}" variant="${badgeVariantByStatus[printer.status] || "neutral"}" pill>${escapeHtml(printer.status)}</sl-badge>
-            <sl-badge class="chance-badge" variant="neutral" pill>${chance.toFixed(0)}% chance</sl-badge>
-          </div>
         </div>
         <div class="printer-head-actions">
+          ${renderStatusDropdown(printer, badgeVariantByStatus)}
+          <sl-badge class="chance-badge" variant="neutral" pill>${chance.toFixed(0)}%</sl-badge>
           ${renderPrinterMenu(printer)}
         </div>
-      </div>
-
-      <div class="meta-row">
-        <label class="printer-status-label">
-          <span class="muted">Status</span>
-          <sl-select class="status-select" data-action="status" data-id="${printer.id}" value="${escapeHtml(printer.status)}">
-            ${STATUSES.map((status) => `<sl-option value="${escapeHtml(status)}">${escapeHtml(status)}</sl-option>`).join("")}
-          </sl-select>
-        </label>
       </div>
 
       <div class="queue-list">
         ${requestList}
       </div>
     </sl-card>
+  `;
+}
+
+function renderStatusDropdown(printer, badgeVariantByStatus) {
+  return `
+    <sl-dropdown placement="bottom-start" class="status-dropdown">
+      <button class="status-chip" slot="trigger" type="button">
+        <sl-badge variant="${badgeVariantByStatus[printer.status] || "neutral"}" pill>${escapeHtml(printer.status)}</sl-badge>
+        <span aria-hidden="true">▾</span>
+      </button>
+      <sl-menu>
+        ${STATUSES.map(
+          (status) => `
+            <sl-menu-item
+              data-action="status"
+              data-id="${printer.id}"
+              data-value="${escapeHtml(status)}"
+              ${status === printer.status ? "checked" : ""}
+            >
+              ${escapeHtml(status)}
+            </sl-menu-item>
+          `
+        ).join("")}
+      </sl-menu>
+    </sl-dropdown>
   `;
 }
 
@@ -1119,7 +1132,7 @@ async function handleShare() {
   if (navigator.share) {
     try {
       await navigator.share({
-        title: "Item Sorter",
+        title: "Printer Queue",
         url: shareUrl,
       });
       showBanner("Share link ready.");
@@ -1246,7 +1259,12 @@ async function handleImport() {
   showBanner("Imported backup text.");
 }
 
-async function handleDataAction(action, id) {
+async function handleDataAction(action, id, value = "") {
+  if (action === "status") {
+    await setPrinterStatus(id, value);
+    return;
+  }
+
   if (action === "printed") {
     moveRequestToPrinted(id);
     return;
@@ -1348,7 +1366,7 @@ function wireEvents() {
       return;
     }
 
-    await handleDataAction(button.dataset.action, button.dataset.id);
+    await handleDataAction(button.dataset.action, button.dataset.id, button.dataset.value);
   });
 
   document.addEventListener("contextmenu", async (event) => {
@@ -1421,7 +1439,7 @@ function wireEvents() {
       return;
     }
 
-    await handleDataAction(item.dataset.action, item.dataset.id);
+    await handleDataAction(item.dataset.action, item.dataset.id, item.dataset.value);
   });
 
   window.addEventListener("storage", (event) => {

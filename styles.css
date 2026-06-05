@@ -47,7 +47,6 @@ body {
 }
 
 .subtitle {
-  max-width: 58ch;
   margin: var(--sl-spacing-small) 0 0;
   line-height: 1.4;
 }
@@ -157,6 +156,11 @@ body {
 .modal-body {
   display: grid;
   gap: var(--sl-spacing-small);
+  min-width: 0;
+}
+
+.printer-meta {
+  flex: 1 1 auto;
 }
 
 .printer-title,
@@ -175,6 +179,27 @@ body {
   flex-wrap: wrap;
   gap: var(--sl-spacing-x-small);
   align-items: center;
+}
+
+.printer-head-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.status-chip {
+  display: inline-flex;
+  gap: var(--sl-spacing-2x-small);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.status-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--sl-focus-ring);
 }
 
 .modal-footer {

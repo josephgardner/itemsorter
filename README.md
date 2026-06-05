@@ -1,4 +1,4 @@
-# Item Sorter
+# Printer Queue
 
 Static GitHub Pages app for managing printers, requests, and printed history.
 
