@@ -1,10 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="sl-theme-dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Item Sorter</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css" />
     <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
   </head>
   <body>
     <div class="page-shell">
@@ -14,11 +17,19 @@
           <p class="subtitle">Weighted random printer assignment with local save, text export, and text import.</p>
         </div>
         <div class="topbar-actions">
-          <button id="addPrinterBtn" class="primary action-add-printer">Add Printer</button>
-          <button id="addRequestBtn" class="primary action-add-request">Add Request</button>
-          <button id="shareBtn" class="action-share">Share</button>
-          <button id="exportBtn" class="action-export">Export Text</button>
-          <button id="importBtn" class="action-import">Import Text</button>
+          <sl-dropdown id="appActionsDropdown" placement="bottom-end">
+            <sl-button slot="trigger" variant="primary" caret>Actions</sl-button>
+            <sl-menu>
+              <sl-menu-item id="addPrinterBtn">Add Printer</sl-menu-item>
+              <sl-menu-item id="addRequestBtn">Add Request</sl-menu-item>
+              <sl-divider></sl-divider>
+              <sl-menu-item id="shareBtn">Share</sl-menu-item>
+              <sl-menu-item id="exportBtn">Export Text</sl-menu-item>
+              <sl-menu-item id="importBtn">Import Text</sl-menu-item>
+              <sl-divider></sl-divider>
+              <sl-menu-item id="themeToggleBtn">Light mode</sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
         </div>
       </header>
 
@@ -51,16 +62,10 @@
       </main>
     </div>
 
-    <div id="modalOverlay" class="modal-overlay hidden" role="presentation" aria-hidden="true">
-      <div id="modalPanel" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-        <div class="modal-head">
-          <h3 id="modalTitle"></h3>
-          <button id="modalCloseBtn" class="icon-btn" aria-label="Close dialog">×</button>
-        </div>
-        <div id="modalBody" class="modal-body"></div>
-        <div id="modalFooter" class="modal-footer"></div>
-      </div>
-    </div>
+    <sl-dialog id="modalDialog" class="app-dialog">
+      <div id="modalBody" class="modal-body"></div>
+      <div id="modalFooter" class="modal-footer" slot="footer"></div>
+    </sl-dialog>
 
     <script src="core.js"></script>
     <script src="app.js"></script>

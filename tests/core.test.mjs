@@ -56,6 +56,37 @@ test("text export and import round-trip", () => {
   assert.equal(parsed.internalId > 0, true);
 });
 
+test("text import skips duplicate printer names", () => {
+  const parsed = core.parseTextState(
+    [
+      EXPORT_VERSION,
+      "",
+      "PRINTERS",
+      "Printer A | ready to use",
+      "printer a | good",
+      "Printer B | unused",
+      "",
+      "ACTIVE",
+      "Widget | Printer A",
+    ].join("\n"),
+    {
+      exportVersion: EXPORT_VERSION,
+      statuses: STATUSES,
+      defaultStatus: DEFAULT_STATUS,
+      now: FIXED_TIME,
+    }
+  );
+
+  assert.deepEqual(
+    parsed.printers.map((printer) => [printer.name, printer.status]),
+    [
+      ["Printer A", "ready to use"],
+      ["Printer B", "unused"],
+    ]
+  );
+  assert.equal(parsed.active[0].printerId, parsed.printers[0].id);
+});
+
 test("compressed share payload round-trips", async () => {
   const shareState = core.buildShareState(sourceState, printerById, 42);
   const encoded = await core.compressText(JSON.stringify(shareState));
@@ -70,4 +101,36 @@ test("compressed share payload round-trips", async () => {
   assert.equal(encoded.includes("."), true);
   assert.deepEqual(summarizeState(parsed), summarizeState(sourceState));
   assert.equal(parsed.internalId >= 42, true);
+});
+
+test("share import skips duplicate printer names", () => {
+  const parsed = core.parseShareState(
+    {
+      v: 1,
+      i: 99,
+      p: [
+        ["Printer A", "ready to use"],
+        ["printer a", "good"],
+        ["Printer B", "unused"],
+      ],
+      a: [["Widget", "Printer A"]],
+      u: [],
+      d: [],
+    },
+    {
+      statuses: STATUSES,
+      defaultStatus: DEFAULT_STATUS,
+      now: FIXED_TIME,
+    }
+  );
+
+  assert.deepEqual(
+    parsed.printers.map((printer) => [printer.name, printer.status]),
+    [
+      ["Printer A", "ready to use"],
+      ["Printer B", "unused"],
+    ]
+  );
+  assert.equal(parsed.active[0].printerId, parsed.printers[0].id);
+  assert.equal(parsed.internalId, 99);
 });

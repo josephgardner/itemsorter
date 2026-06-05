@@ -1,4 +1,5 @@
 const STORAGE_KEY = "itemsorter.raw.v1";
+const THEME_KEY = "itemsorter.theme.v2";
 const EXPORT_VERSION = "ITEMSORTER v1";
 const SHARE_HASH_KEY = "state";
 const RECENT_WINDOW = 5;
@@ -14,11 +15,13 @@ const state = {
 };
 
 const dom = {
+  appActionsDropdown: document.getElementById("appActionsDropdown"),
   addPrinterBtn: document.getElementById("addPrinterBtn"),
   addRequestBtn: document.getElementById("addRequestBtn"),
   shareBtn: document.getElementById("shareBtn"),
   exportBtn: document.getElementById("exportBtn"),
   importBtn: document.getElementById("importBtn"),
+  themeToggleBtn: document.getElementById("themeToggleBtn"),
   printersContainer: document.getElementById("printersContainer"),
   unassignedContainer: document.getElementById("unassignedContainer"),
   printedContainer: document.getElementById("printedContainer"),
@@ -26,16 +29,15 @@ const dom = {
   unassignedCount: document.getElementById("unassignedCount"),
   printedCount: document.getElementById("printedCount"),
   statusBanner: document.getElementById("statusBanner"),
-  modalOverlay: document.getElementById("modalOverlay"),
-  modalPanel: document.getElementById("modalPanel"),
-  modalTitle: document.getElementById("modalTitle"),
+  modalDialog: document.getElementById("modalDialog"),
   modalBody: document.getElementById("modalBody"),
   modalFooter: document.getElementById("modalFooter"),
-  modalCloseBtn: document.getElementById("modalCloseBtn"),
 };
 
 let internalId = 1;
 let activeModal = null;
+let currentTheme = "dark";
+const INTERACTIVE_SELECTOR = "button, sl-button, sl-dropdown, sl-select, sl-input, sl-textarea, select, input, textarea, label";
 
 function uid(prefix) {
   internalId += 1;
@@ -52,6 +54,28 @@ function cleanText(value) {
 function showBanner(message, kind = "info") {
   dom.statusBanner.textContent = message || "";
   dom.statusBanner.dataset.kind = kind;
+}
+
+function applyTheme(theme) {
+  currentTheme = theme === "light" ? "light" : "dark";
+  document.documentElement.classList.toggle("sl-theme-dark", currentTheme === "dark");
+  document.documentElement.classList.toggle("sl-theme-light", currentTheme === "light");
+  dom.themeToggleBtn.textContent = currentTheme === "light" ? "Dark mode" : "Light mode";
+  localStorage.setItem(THEME_KEY, currentTheme);
+}
+
+function loadTheme() {
+  const savedTheme = localStorage.getItem(THEME_KEY);
+  if (savedTheme === "light" || savedTheme === "dark") {
+    applyTheme(savedTheme);
+    return;
+  }
+
+  applyTheme("dark");
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme === "light" ? "dark" : "light");
 }
 
 function escapeHtml(value) {
@@ -119,26 +143,25 @@ function applyParsedState(parsed) {
 
 function openModal({ title, body, footerButtons = [], onClose = null, kind = "default" }) {
   activeModal = { onClose };
-  dom.modalTitle.textContent = title;
+  dom.modalDialog.label = title;
   dom.modalBody.innerHTML = body;
   dom.modalFooter.innerHTML = "";
-  dom.modalPanel.dataset.kind = kind;
+  dom.modalDialog.dataset.kind = kind;
 
   for (const button of footerButtons) {
-    const el = document.createElement("button");
+    const el = document.createElement("sl-button");
     el.textContent = button.label;
     if (button.primary) {
-      el.classList.add("primary");
+      el.setAttribute("variant", "primary");
     }
     if (button.danger) {
-      el.classList.add("danger");
+      el.setAttribute("variant", "danger");
     }
     el.addEventListener("click", button.onClick);
     dom.modalFooter.appendChild(el);
   }
 
-  dom.modalOverlay.classList.remove("hidden");
-  dom.modalOverlay.setAttribute("aria-hidden", "false");
+  dom.modalDialog.show();
 }
 
 function closeModal() {
@@ -146,10 +169,9 @@ function closeModal() {
     activeModal.onClose();
   }
   activeModal = null;
-  dom.modalOverlay.classList.add("hidden");
-  dom.modalOverlay.setAttribute("aria-hidden", "true");
-  delete dom.modalPanel.dataset.kind;
-  dom.modalTitle.textContent = "";
+  dom.modalDialog.hide();
+  delete dom.modalDialog.dataset.kind;
+  dom.modalDialog.label = "";
   dom.modalBody.innerHTML = "";
   dom.modalFooter.innerHTML = "";
 }
@@ -213,10 +235,7 @@ function promptDialog(title, label, value = "") {
     openModal({
       title,
       body: `
-        <label for="${inputId}">
-          <span>${escapeHtml(label)}</span>
-          <input id="${inputId}" type="text" value="${escapeHtml(value)}" />
-        </label>
+        <sl-input id="${inputId}" type="text" label="${escapeHtml(label)}" value="${escapeHtml(value)}"></sl-input>
       `,
       footerButtons: [
         {
@@ -247,18 +266,14 @@ function choiceDialog(title, label, choices, initialValue) {
     const selectId = uid("select");
     const options = choices
       .map((choice) => {
-        const selected = choice.value === initialValue ? "selected" : "";
-        return `<option value="${escapeHtml(choice.value)}" ${selected}>${escapeHtml(choice.label)}</option>`;
+        return `<sl-option value="${escapeHtml(choice.value)}">${escapeHtml(choice.label)}</sl-option>`;
       })
       .join("");
 
     openModal({
       title,
       body: `
-        <label for="${selectId}">
-          <span>${escapeHtml(label)}</span>
-          <select id="${selectId}">${options}</select>
-        </label>
+        <sl-select id="${selectId}" label="${escapeHtml(label)}" value="${escapeHtml(initialValue)}">${options}</sl-select>
       `,
       footerButtons: [
         {
@@ -303,15 +318,15 @@ function textAreaDialog(title, helpText, value = "", kind = "default") {
             <div class="backup-card__version">paste / file</div>
           </div>
 
-          <label class="backup-card__field" for="${areaId}">
-            <span>Text</span>
-            <textarea id="${areaId}" spellcheck="false" placeholder="Paste backup text here">${escapeHtml(value)}</textarea>
-          </label>
+          <sl-textarea
+            id="${areaId}"
+            label="Text"
+            value="${escapeHtml(value)}"
+            spellcheck="false"
+            placeholder="Paste backup text here"
+          ></sl-textarea>
 
-          <label class="backup-card__file" for="${fileId}">
-            <span>Choose a .txt file</span>
-            <input id="${fileId}" type="file" accept=".txt,text/plain" />
-          </label>
+          <sl-input id="${fileId}" type="file" label="Choose a .txt file" accept=".txt,text/plain"></sl-input>
         </section>
       `,
       footerButtons: [
@@ -327,7 +342,7 @@ function textAreaDialog(title, helpText, value = "", kind = "default") {
           primary: true,
           onClick: async () => {
             const area = document.getElementById(areaId);
-            const file = document.getElementById(fileId).files?.[0];
+            const file = document.getElementById(fileId).input?.files?.[0];
             if (file) {
               const text = await file.text();
               closeModal();
@@ -362,8 +377,25 @@ function requestById(id) {
   );
 }
 
+function requestKindById(id) {
+  if (state.active.some((request) => request.id === id)) {
+    return "active";
+  }
+  if (state.unassigned.some((request) => request.id === id)) {
+    return "unassigned";
+  }
+  if (state.printed.some((request) => request.id === id)) {
+    return "printed";
+  }
+  return null;
+}
+
 function activeRequestsForPrinter(printerId) {
   return state.active.filter((request) => request.printerId === printerId);
+}
+
+function isPrinterEligible(printer) {
+  return Boolean(printer && ELIGIBLE_STATUSES.has(printer.status));
 }
 
 function recentPrintedCount(printerId) {
@@ -374,7 +406,7 @@ function recentPrintedCount(printerId) {
 }
 
 function printerWeight(printer) {
-  if (!ELIGIBLE_STATUSES.has(printer.status)) {
+  if (!isPrinterEligible(printer)) {
     return 0;
   }
 
@@ -537,11 +569,20 @@ function autoAssignRequest(title) {
 }
 
 function moveRequestToPrinted(requestId) {
-  const index = state.active.findIndex((request) => request.id === requestId);
-  if (index === -1) {
+  const activeIndex = state.active.findIndex((request) => request.id === requestId);
+  const unassignedIndex = state.unassigned.findIndex((request) => request.id === requestId);
+  let request = null;
+
+  if (activeIndex !== -1) {
+    request = state.active.splice(activeIndex, 1)[0];
+  } else if (unassignedIndex !== -1) {
+    request = state.unassigned.splice(unassignedIndex, 1)[0];
+  }
+
+  if (!request) {
     return;
   }
-  const [request] = state.active.splice(index, 1);
+
   state.printed.push({
     ...request,
     printedAt: Date.now(),
@@ -568,6 +609,9 @@ async function reassignRequest(requestId, currentPrinterId = null) {
 
   for (const printer of state.printers) {
     if (currentPrinter && printer.id === currentPrinter.id) {
+      continue;
+    }
+    if (!isPrinterEligible(printer)) {
       continue;
     }
     choices.push({ value: printer.id, label: printer.name });
@@ -626,6 +670,9 @@ async function assignExistingRequest(requestId, printerId = null, excludeIds = n
   }
 
   let targetPrinter = printerId ? printerById(printerId) : null;
+  if (!isPrinterEligible(targetPrinter)) {
+    targetPrinter = null;
+  }
   if (!targetPrinter) {
     targetPrinter = weightedPrinterChoice(excludeIds);
   }
@@ -732,6 +779,52 @@ async function showPrinterActions(printerId) {
   }
 }
 
+async function showRequestActions(requestId) {
+  const request = requestById(requestId);
+  const kind = requestKindById(requestId);
+  if (!request || !kind) {
+    return;
+  }
+
+  const actions = [
+    { label: "Rename", value: "rename" },
+    { label: "Reassign", value: "reassign", primary: kind !== "printed" },
+  ];
+
+  if (kind === "printed") {
+    actions.push({ label: "Restore", value: "restore", primary: true });
+  } else {
+    actions.push({ label: "Printed", value: "printed" });
+  }
+
+  const action = await actionDialog(
+    "Request Actions",
+    `What do you want to do with "${request.title}"?`,
+    actions
+  );
+
+  if (action === "rename") {
+    await renameRequest(requestId);
+    return;
+  }
+
+  if (action === "printed") {
+    moveRequestToPrinted(requestId);
+    return;
+  }
+
+  if (action === "reassign") {
+    const currentRequest = requestById(requestId);
+    await reassignRequest(requestId, currentRequest?.printerId || null);
+    return;
+  }
+
+  if (action === "restore") {
+    const currentRequest = requestById(requestId);
+    await assignExistingRequest(requestId, currentRequest?.printerId || null);
+  }
+}
+
 async function setPrinterStatus(printerId, nextStatus) {
   const printer = printerById(printerId);
   if (!printer) {
@@ -743,7 +836,7 @@ async function setPrinterStatus(printerId, nextStatus) {
   saveState();
   render();
 
-  if (nextStatus === "down") {
+  if (!isPrinterEligible(printer)) {
     const requests = activeRequestsForPrinter(printerId);
     if (requests.length) {
       for (const request of [...requests]) {
@@ -757,60 +850,93 @@ function renderPrinterCard(printer, chanceById) {
   const activeRequests = activeRequestsForPrinter(printer.id);
   const chance = chanceById.get(printer.id) || 0;
   const badgeClass = printer.status.replaceAll(" ", "-");
+  const badgeVariantByStatus = {
+    "ready to use": "success",
+    good: "primary",
+    unused: "neutral",
+    clogged: "warning",
+    down: "danger",
+  };
   const cardClass = printer.status === "down" ? "printer-card down" : "printer-card";
 
   const requestList = activeRequests.length
     ? activeRequests
         .map(
           (request) => `
-            <div class="queue-card" data-request-id="${request.id}">
+            <sl-card class="queue-card queue-card--nested" data-request-id="${request.id}">
               <div class="queue-main">
                 <div class="queue-title">${escapeHtml(request.title)}</div>
                 <div class="queue-subtitle">Assigned to ${escapeHtml(printer.name)}</div>
               </div>
               <div class="queue-actions">
-                <button data-action="rename-request" data-id="${request.id}">Rename</button>
-                <button data-action="printed" data-id="${request.id}">Printed</button>
-                <button data-action="reassign" data-id="${request.id}">Reassign</button>
+                ${renderRequestMenu(request, "active")}
               </div>
-            </div>
+            </sl-card>
           `
         )
         .join("")
     : `<div class="empty-state">No active requests.</div>`;
 
   return `
-    <article class="${cardClass}" data-printer-id="${printer.id}">
+    <sl-card class="${cardClass}" data-printer-id="${printer.id}">
       <div class="printer-head">
         <div class="printer-meta">
           <h3 class="printer-title">${escapeHtml(printer.name)}</h3>
           <div class="meta-row">
-            <span class="badge ${badgeClass}">${escapeHtml(printer.status)}</span>
-            <span class="badge chance">${chance.toFixed(0)}% chance</span>
+            <sl-badge class="status-badge status-badge--${badgeClass}" variant="${badgeVariantByStatus[printer.status] || "neutral"}" pill>${escapeHtml(printer.status)}</sl-badge>
+            <sl-badge class="chance-badge" variant="neutral" pill>${chance.toFixed(0)}% chance</sl-badge>
           </div>
         </div>
         <div class="printer-head-actions">
-          <button class="icon-btn" data-action="rename-printer" data-id="${printer.id}" aria-label="Rename printer">✎</button>
-          <button class="icon-btn" data-action="delete-printer" data-id="${printer.id}" aria-label="Delete printer">×</button>
+          ${renderPrinterMenu(printer)}
         </div>
       </div>
 
       <div class="meta-row">
         <label class="printer-status-label">
           <span class="muted">Status</span>
-          <select class="status-select" data-action="status" data-id="${printer.id}">
-            ${STATUSES.map((status) => `<option value="${status}" ${status === printer.status ? "selected" : ""}>${status}</option>`).join("")}
-          </select>
+          <sl-select class="status-select" data-action="status" data-id="${printer.id}" value="${escapeHtml(printer.status)}">
+            ${STATUSES.map((status) => `<sl-option value="${escapeHtml(status)}">${escapeHtml(status)}</sl-option>`).join("")}
+          </sl-select>
         </label>
-      </div>
-      <div class="printer-actions">
-        <button data-action="reassign-all" data-id="${printer.id}">Reassign work</button>
       </div>
 
       <div class="queue-list">
         ${requestList}
       </div>
-    </article>
+    </sl-card>
+  `;
+}
+
+function renderPrinterMenu(printer) {
+  return `
+    <sl-dropdown placement="bottom-end">
+      <sl-button slot="trigger" size="small" caret>Printer</sl-button>
+      <sl-menu>
+        <sl-menu-item data-action="rename-printer" data-id="${printer.id}">Rename</sl-menu-item>
+        <sl-menu-item data-action="reassign-all" data-id="${printer.id}">Reassign work</sl-menu-item>
+        <sl-divider></sl-divider>
+        <sl-menu-item data-action="delete-printer" data-id="${printer.id}">Delete</sl-menu-item>
+      </sl-menu>
+    </sl-dropdown>
+  `;
+}
+
+function renderRequestMenu(request, kind) {
+  const lifecycleButton =
+    kind === "printed"
+      ? `<sl-menu-item data-action="restore" data-id="${request.id}">Restore</sl-menu-item>`
+      : `<sl-menu-item data-action="printed" data-id="${request.id}">Mark printed</sl-menu-item>`;
+
+  return `
+    <sl-dropdown placement="bottom-end">
+      <sl-button slot="trigger" size="small" caret>Request</sl-button>
+      <sl-menu>
+        <sl-menu-item data-action="rename-request" data-id="${request.id}">Rename</sl-menu-item>
+        ${lifecycleButton}
+        <sl-menu-item data-action="reassign" data-id="${request.id}">Reassign</sl-menu-item>
+      </sl-menu>
+    </sl-dropdown>
   `;
 }
 
@@ -826,36 +952,19 @@ function renderQueueCard(request, kind) {
         : "Waiting for assignment";
   const printerLabel = printer ? printer.name : "Unassigned";
 
-  const buttons =
-    kind === "printed"
-      ? `
-        <button data-action="rename-request" data-id="${request.id}">Rename</button>
-        <button data-action="restore" data-id="${request.id}">Restore</button>
-      `
-      : kind === "active"
-        ? `
-          <button data-action="rename-request" data-id="${request.id}">Rename</button>
-          <button data-action="printed" data-id="${request.id}">Printed</button>
-          <button data-action="reassign" data-id="${request.id}">Move</button>
-        `
-        : `
-          <button data-action="rename-request" data-id="${request.id}">Rename</button>
-          <button data-action="reassign" data-id="${request.id}">Assign</button>
-        `;
-
   return `
-    <div class="queue-card" data-request-id="${request.id}">
+    <sl-card class="queue-card queue-card--${kind}" data-request-id="${request.id}">
       <div class="queue-main">
         <div class="queue-title">${escapeHtml(request.title)}</div>
         <div class="queue-subtitle">${escapeHtml(subtitle)}</div>
         <div class="pill-list">
-          <span class="badge ${kind === "printed" ? "good" : "unused"}">${escapeHtml(printerLabel)}</span>
+          <sl-badge class="queue-badge" variant="${kind === "printed" ? "success" : "warning"}" pill>${escapeHtml(printerLabel)}</sl-badge>
         </div>
       </div>
       <div class="queue-actions">
-        ${buttons}
+        ${renderRequestMenu(request, kind)}
       </div>
-    </div>
+    </sl-card>
   `;
 }
 
@@ -930,10 +1039,7 @@ async function handleExport() {
           </div>
         </div>
 
-        <label class="backup-card__field">
-          <span>Backup text</span>
-          <textarea id="exportTextArea" readonly rows="14">${escapeHtml(text)}</textarea>
-        </label>
+        <sl-textarea id="exportTextArea" label="Backup text" value="${escapeHtml(text)}" readonly rows="14"></sl-textarea>
 
         <p class="backup-card__note">Keep the section headers. The file stays easy to read on purpose.</p>
       </section>
@@ -1008,10 +1114,7 @@ async function handleShare() {
   openModal({
     title: "Share Link",
     body: `
-      <label>
-        <span>Copy this link and send it to someone</span>
-        <textarea id="shareLinkArea" readonly rows="4">${escapeHtml(shareUrl)}</textarea>
-      </label>
+      <sl-textarea id="shareLinkArea" label="Copy this link and send it to someone" value="${escapeHtml(shareUrl)}" readonly rows="4"></sl-textarea>
     `,
     footerButtons: [
       {
@@ -1023,9 +1126,9 @@ async function handleShare() {
 
   queueMicrotask(() => {
     const area = document.getElementById("shareLinkArea");
-    if (area instanceof HTMLTextAreaElement) {
+    if (area) {
       area.focus();
-      area.select();
+      area.input?.select();
     }
   });
 }
@@ -1112,17 +1215,88 @@ async function handleImport() {
   showBanner("Imported backup text.");
 }
 
+async function handleDataAction(action, id) {
+  if (action === "printed") {
+    moveRequestToPrinted(id);
+    return;
+  }
+
+  if (action === "rename-request") {
+    await renameRequest(id);
+    return;
+  }
+
+  if (action === "reassign") {
+    const currentRequest = requestById(id);
+    await reassignRequest(id, currentRequest?.printerId || null);
+    return;
+  }
+
+  if (action === "reassign-all") {
+    await movePrinterWorkToOtherPrinters(id);
+    return;
+  }
+
+  if (action === "rename-printer") {
+    await renamePrinter(id);
+    return;
+  }
+
+  if (action === "delete-printer") {
+    removePrinter(id);
+    return;
+  }
+
+  if (action === "restore") {
+    const currentRequest = requestById(id);
+    await assignExistingRequest(id, currentRequest?.printerId || null);
+  }
+}
+
+async function handleAppMenuSelection(itemId) {
+  if (itemId === "addPrinterBtn") {
+    await handleAddPrinter();
+    return;
+  }
+
+  if (itemId === "addRequestBtn") {
+    await handleAddRequest();
+    return;
+  }
+
+  if (itemId === "shareBtn") {
+    await handleShare();
+    return;
+  }
+
+  if (itemId === "exportBtn") {
+    await handleExport();
+    return;
+  }
+
+  if (itemId === "importBtn") {
+    await handleImport();
+    return;
+  }
+
+  if (itemId === "themeToggleBtn") {
+    toggleTheme();
+  }
+}
+
 function wireEvents() {
-  dom.addPrinterBtn.addEventListener("click", handleAddPrinter);
-  dom.addRequestBtn.addEventListener("click", handleAddRequest);
-  dom.shareBtn.addEventListener("click", handleShare);
-  dom.exportBtn.addEventListener("click", handleExport);
-  dom.importBtn.addEventListener("click", handleImport);
-  dom.modalCloseBtn.addEventListener("click", closeModal);
-  dom.modalOverlay.addEventListener("click", (event) => {
-    if (event.target === dom.modalOverlay) {
-      closeModal();
+  dom.appActionsDropdown.addEventListener("sl-select", async (event) => {
+    await handleAppMenuSelection(event.detail?.item?.id);
+  });
+  dom.modalDialog.addEventListener("sl-after-hide", () => {
+    if (activeModal?.onClose) {
+      activeModal.onClose();
     }
+    activeModal = null;
+    delete dom.modalDialog.dataset.kind;
+    dom.modalDialog.label = "";
+    dom.modalBody.innerHTML = "";
+    dom.modalFooter.innerHTML = "";
   });
 
   document.addEventListener("click", async (event) => {
@@ -1134,45 +1308,11 @@ function wireEvents() {
     if (!button) {
       return;
     }
-
-    const action = button.dataset.action;
-    const id = button.dataset.id;
-
-    if (action === "printed") {
-      moveRequestToPrinted(id);
+    if (button.tagName.toLowerCase() === "sl-menu-item") {
       return;
     }
 
-    if (action === "rename-request") {
-      await renameRequest(id);
-      return;
-    }
-
-    if (action === "reassign") {
-      const currentRequest = requestById(id);
-      await reassignRequest(id, currentRequest?.printerId || null);
-      return;
-    }
-
-    if (action === "reassign-all") {
-      await movePrinterWorkToOtherPrinters(id);
-      return;
-    }
-
-    if (action === "rename-printer") {
-      await renamePrinter(id);
-      return;
-    }
-
-    if (action === "delete-printer") {
-      removePrinter(id);
-      return;
-    }
-
-    if (action === "restore") {
-      const currentRequest = requestById(id);
-      await assignExistingRequest(id, currentRequest?.printerId || null);
-    }
+    await handleDataAction(button.dataset.action, button.dataset.id);
   });
 
   document.addEventListener("contextmenu", async (event) => {
@@ -1180,8 +1320,15 @@ function wireEvents() {
       return;
     }
 
+    const requestCard = event.target.closest(".queue-card[data-request-id]");
+    if (requestCard && !event.target.closest(INTERACTIVE_SELECTOR)) {
+      event.preventDefault();
+      await showRequestActions(requestCard.dataset.requestId);
+      return;
+    }
+
     const card = event.target.closest(".printer-card[data-printer-id]");
-    if (!card || event.target.closest("button, select, input, textarea, label")) {
+    if (!card || event.target.closest(INTERACTIVE_SELECTOR)) {
       return;
     }
 
@@ -1194,15 +1341,15 @@ function wireEvents() {
       return;
     }
 
-    const card = event.target.closest(".printer-card[data-printer-id]");
-    if (!card || event.target.closest("button, select, input, textarea, label")) {
-      const requestCard = event.target.closest(".queue-card[data-request-id]");
-      if (!requestCard || event.target.closest("button, select, input, textarea, label")) {
-        return;
-      }
-
+    const requestCard = event.target.closest(".queue-card[data-request-id]");
+    if (requestCard && !event.target.closest(INTERACTIVE_SELECTOR)) {
       event.preventDefault();
       await renameRequest(requestCard.dataset.requestId);
+      return;
+    }
+
+    const card = event.target.closest(".printer-card[data-printer-id]");
+    if (!card || event.target.closest(INTERACTIVE_SELECTOR)) {
       return;
     }
 
@@ -1221,6 +1368,26 @@ function wireEvents() {
     }
   });
 
+  document.addEventListener("sl-change", async (event) => {
+    const target = event.target;
+    if (!(target instanceof Element) || target.tagName.toLowerCase() !== "sl-select") {
+      return;
+    }
+
+    if (target.dataset.action === "status") {
+      await setPrinterStatus(target.dataset.id, target.value);
+    }
+  });
+
+  document.addEventListener("sl-select", async (event) => {
+    const item = event.detail?.item;
+    if (!(item instanceof Element) || !item.dataset.action) {
+      return;
+    }
+
+    await handleDataAction(item.dataset.action, item.dataset.id);
+  });
+
   window.addEventListener("storage", (event) => {
     if (event.key !== STORAGE_KEY || !event.newValue) {
       return;
@@ -1237,6 +1404,7 @@ function wireEvents() {
 }
 
 async function bootstrap() {
+  loadTheme();
   const sharedState = await loadSharedStateFromUrl();
   if (sharedState) {
     applyParsedState(sharedState);

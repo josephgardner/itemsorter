@@ -170,13 +170,17 @@
         if (!name) {
           continue;
         }
+        const printerKey = name.toLowerCase();
+        if (printerByName.has(printerKey)) {
+          continue;
+        }
         const printer = {
           id: genId("printer"),
           name,
           status,
         };
         parsed.printers.push(printer);
-        printerByName.set(name.toLowerCase(), printer);
+        printerByName.set(printerKey, printer);
         continue;
       }
 
@@ -264,6 +268,10 @@
       if (!name) {
         continue;
       }
+      const printerKey = name.toLowerCase();
+      if (printerByName.has(printerKey)) {
+        continue;
+      }
 
       const printer = {
         id: genId("printer"),
@@ -271,7 +279,7 @@
         status: validStatuses.has(status) ? status : defaultStatus,
       };
       parsed.printers.push(printer);
-      printerByName.set(name.toLowerCase(), printer);
+      printerByName.set(printerKey, printer);
     }
 
     for (const entry of Array.isArray(data.a) ? data.a : []) {
