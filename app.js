@@ -546,6 +546,29 @@ async function renameRequest(requestId) {
   render();
 }
 
+async function deleteRequest(requestId) {
+  const request = requestById(requestId);
+  if (!request) {
+    return;
+  }
+
+  const ok = await confirmDialog(
+    "Delete Request",
+    `Delete "${request.title}"? This cannot be undone.`,
+    "Delete"
+  );
+  if (!ok) {
+    return;
+  }
+
+  state.active = state.active.filter((entry) => entry.id !== requestId);
+  state.unassigned = state.unassigned.filter((entry) => entry.id !== requestId);
+  state.printed = state.printed.filter((entry) => entry.id !== requestId);
+  showBanner(`Deleted request: ${request.title}`);
+  saveState();
+  render();
+}
+
 function autoAssignRequest(title) {
   const request = {
     id: uid("request"),
@@ -796,6 +819,7 @@ async function showRequestActions(requestId) {
   } else {
     actions.push({ label: "Printed", value: "printed" });
   }
+  actions.push({ label: "Delete", value: "delete", danger: true });
 
   const action = await actionDialog(
     "Request Actions",
@@ -822,6 +846,11 @@ async function showRequestActions(requestId) {
   if (action === "restore") {
     const currentRequest = requestById(requestId);
     await assignExistingRequest(requestId, currentRequest?.printerId || null);
+    return;
+  }
+
+  if (action === "delete") {
+    await deleteRequest(requestId);
   }
 }
 
@@ -935,6 +964,8 @@ function renderRequestMenu(request, kind) {
         <sl-menu-item data-action="rename-request" data-id="${request.id}">Rename</sl-menu-item>
         ${lifecycleButton}
         <sl-menu-item data-action="reassign" data-id="${request.id}">Reassign</sl-menu-item>
+        <sl-divider></sl-divider>
+        <sl-menu-item data-action="delete-request" data-id="${request.id}">Delete</sl-menu-item>
       </sl-menu>
     </sl-dropdown>
   `;
@@ -1223,6 +1254,11 @@ async function handleDataAction(action, id) {
 
   if (action === "rename-request") {
     await renameRequest(id);
+    return;
+  }
+
+  if (action === "delete-request") {
+    await deleteRequest(id);
     return;
   }
 
