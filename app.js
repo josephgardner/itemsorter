@@ -894,7 +894,6 @@ function renderPrinterCard(printer, chanceById) {
             <sl-card class="queue-card queue-card--nested" data-request-id="${request.id}">
               <div class="queue-main">
                 <div class="queue-title">${escapeHtml(request.title)}</div>
-                <div class="queue-subtitle">Assigned to ${escapeHtml(printer.name)}</div>
               </div>
               <div class="queue-actions">
                 ${renderRequestMenu(request, "active")}
